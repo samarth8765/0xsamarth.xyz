@@ -54,7 +54,7 @@ jobs:
       SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/var/www/0xsamarth.xyz' }}
       RELEASE: ${{ github.sha }}
-      SITE_URL: ${{ vars.SITE_URL || format('http://{0}/', secrets.HOST) }}
+      SITE_URL: ${{ vars.SITE_URL || 'https://0xsamarth.xyz/' }}
     steps:
       - uses: actions/download-artifact@v4
         with:

@@ -40,8 +40,8 @@ GitHub repository secrets:
 | `USER` | yes | — |
 | `SSH_KEY` | yes | — (private key) |
 | `SSH_PORT` | no | `22` |
-| `DEPLOY_PATH` | no | `/home/vizz/0xsamarth.xyz` |
+| `DEPLOY_PATH` | no | `/var/www/0xsamarth.xyz` |
 
-Optional repository variable `SITE_URL` overrides the post-deploy smoke-test URL (defaults to `http://$HOST/`).
+Optional repository variable `SITE_URL` overrides the post-deploy smoke-test URL (defaults to `https://0xsamarth.xyz/`).
 
 nginx serves `current/` using `deploy/nginx.conf`. One-time server setup (DNS, packages, deploy key, nginx, HTTPS) is in [`deploy/SETUP.md`](deploy/SETUP.md). `vercel.json` and `public/_redirects` are only needed if you host on Vercel or Netlify.
