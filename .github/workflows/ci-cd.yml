@@ -52,7 +52,7 @@ jobs:
       SSH_HOST: ${{ secrets.HOST }}
       SSH_USER: ${{ secrets.USER }}
       SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/home/vizz/0xsamarth.xyz' }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/var/www/0xsamarth.xyz' }}
       RELEASE: ${{ github.sha }}
       SITE_URL: ${{ vars.SITE_URL || format('http://{0}/', secrets.HOST) }}
     steps:
