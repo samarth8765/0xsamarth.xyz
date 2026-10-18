@@ -1,0 +1,103 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Builds for the same ref cancel each other; deploys never do (see the deploy job).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build # typecheck + vite build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    # One deploy at a time, and never interrupt one halfway through.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      SSH_HOST: ${{ secrets.HOST }}
+      SSH_USER: ${{ secrets.USER }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/home/vizz/0xsamarth.xyz' }}
+      RELEASE: ${{ github.sha }}
+      SITE_URL: ${{ vars.SITE_URL || format('http://{0}/', secrets.HOST) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" > ~/.ssh/known_hosts
+          test -s ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host *
+            BatchMode yes
+            ConnectTimeout 15
+            ServerAliveInterval 15
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Upload release
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p '$DEPLOY_PATH/releases/$RELEASE'"
+          rsync -az --delete -e "ssh -p $SSH_PORT" \
+            dist/ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/releases/$RELEASE/"
+
+      # Atomically point "current" at the new release, then keep only the last 5.
+      - name: Activate release
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" bash -se <<SCRIPT
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+            test -f "releases/$RELEASE/index.html"
+            ln -sfn "releases/$RELEASE" current.tmp
+            mv -Tf current.tmp current
+            test -f current/index.html
+            ls -1dt releases/*/ 2>/dev/null | tail -n +6 | xargs -r rm -rf
+          SCRIPT
+
+      - name: Smoke test
+        run: |
+          curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors --max-time 15 "$SITE_URL" \
+            | grep -q 'id="root"'

@@ -30,4 +30,18 @@ Content here. GitHub-flavored markdown and code highlighting work.
 
 ## Deploying
 
-`vercel.json` (Vercel) and `public/_redirects` (Netlify) already set up the SPA fallback, so `/blog/*` URLs work when someone refreshes the page.
+Pushing to `main` runs `.github/workflows/ci-cd.yml`. The build job typechecks and builds `dist/`; the deploy job rsyncs it to `<DEPLOY_PATH>/releases/<sha>`, then atomically points the `current` symlink at that release. The last 5 releases are kept, so rolling back is pointing `current` at an older release.
+
+GitHub repository secrets:
+
+| Secret | Required | Default |
+| ------ | -------- | ------- |
+| `HOST` | yes | — |
+| `USER` | yes | — |
+| `SSH_KEY` | yes | — (private key) |
+| `SSH_PORT` | no | `22` |
+| `DEPLOY_PATH` | no | `/home/vizz/0xsamarth.xyz` |
+
+Optional repository variable `SITE_URL` overrides the post-deploy smoke-test URL (defaults to `http://$HOST/`).
+
+nginx serves `current/` using `deploy/nginx.conf`. One-time server setup (DNS, packages, deploy key, nginx, HTTPS) is in [`deploy/SETUP.md`](deploy/SETUP.md). `vercel.json` and `public/_redirects` are only needed if you host on Vercel or Netlify.
